@@ -68,11 +68,11 @@ jobs:
     # Publish only from real publishes in the upstream repo: main-branch and
     # tag pushes. workflow_dispatch (any branch) and PRs stay build-only, as
     # in release.yml. The repository guard keeps a fork's `main` push from
-    # failing against ghcr.io/opensuse/mtui with the fork's token. `github`
+    # failing against ghcr.io/plusky/mtui-scratch with the fork's token. `github`
     # is allowed in job-level `env:` (unlike `secrets` in step `if:`, hence
     # HAS_OBS_CREDS below).
     env:
-      PUSH_IMAGE: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.repository == 'openSUSE/mtui' }}
+      PUSH_IMAGE: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.repository == 'plusky/mtui-scratch' }}
       # The `secrets` context is not available in step `if:`, so mirror
       # credential presence is mapped here (job-level `env:` allows it) and
       # the mirror steps gate on `env.HAS_OBS_CREDS`. A presence flag, not
@@ -102,7 +102,7 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6.2.0
         with:
           # Lowercase: registry references reject the `openSUSE` capitalisation.
-          images: ghcr.io/opensuse/mtui
+          images: ghcr.io/plusky/mtui-scratch
           # `latest=false`: the implicit auto-latest fires for every semver
           # tag event — including `-rc` prereleases — and would duplicate the
           # explicit raw `latest` below on GA tags. `latest` is managed
@@ -127,7 +127,7 @@ jobs:
           file: Containerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=ghcr.io/opensuse/mtui,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=ghcr.io/plusky/mtui-scratch,push-by-digest=true,name-canonical=true,push=true
           build-args: |
             BUILD_VERSION=${{ github.ref_type == 'tag' && github.ref_name || 'edge' }}
             BUILD_REVISION=${{ github.sha }}
@@ -176,7 +176,7 @@ jobs:
     needs: [build]
     # Manifest assembly runs only on real publishes; PR/dispatch legs pushed
     # no digest, so there is nothing to merge.
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.repository == 'openSUSE/mtui'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.repository == 'plusky/mtui-scratch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -189,7 +189,7 @@ jobs:
     env:
       # Same publish gate as the build legs (this job's `if:` above already
       # enforces it); the mirror steps add HAS_OBS_CREDS.
-      PUSH_IMAGE: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.repository == 'openSUSE/mtui' }}
+      PUSH_IMAGE: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && github.repository == 'plusky/mtui-scratch' }}
       HAS_OBS_CREDS: ${{ secrets.OBS_REGISTRY_USERNAME != '' && secrets.OBS_REGISTRY_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -217,7 +217,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6.2.0
         with:
-          images: ghcr.io/opensuse/mtui
+          images: ghcr.io/plusky/mtui-scratch
           flavor: latest=false
           tags: |
             type=edge,branch=main
@@ -238,7 +238,7 @@ jobs:
           first_tag="$(jq -r '.tags[0]' <<< "$TAGS_JSON")"
           if [ -z "$first_tag" ] || [ "$first_tag" = "null" ]; then echo "::error::no tags from metadata" >&2; exit 1; fi
           # shellcheck disable=SC2046
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$TAGS_JSON") $(printf 'ghcr.io/opensuse/mtui@sha256:%s ' *)
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$TAGS_JSON") $(printf 'ghcr.io/plusky/mtui-scratch@sha256:%s ' *)
           # The new list may need a moment to propagate; retry the read.
           merged=""
           for _ in 1 2 3 4 5; do
@@ -258,12 +258,12 @@ jobs:
           DIGEST: ${{ steps.merge.outputs.digest }}
         run: |
           set -euo pipefail
-          cosign sign --yes "ghcr.io/opensuse/mtui@${DIGEST}"
+          cosign sign --yes "ghcr.io/plusky/mtui-scratch@${DIGEST}"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
-          subject-name: ghcr.io/opensuse/mtui
+          subject-name: ghcr.io/plusky/mtui-scratch
           subject-digest: ${{ steps.merge.outputs.digest }}
 
       # Mirror the ghcr.io manifest list to registry.opensuse.org tag-for-tag.
@@ -290,7 +290,7 @@ jobs:
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             mirror="${tag/ghcr.io\/opensuse/registry.opensuse.org\/opensuse}"
-            docker buildx imagetools create -t "$mirror" "ghcr.io/opensuse/mtui@${DIGEST}"
+            docker buildx imagetools create -t "$mirror" "ghcr.io/plusky/mtui-scratch@${DIGEST}"
           done <<< "$TAGS"
           cosign sign --yes "registry.opensuse.org/opensuse/mtui@${DIGEST}"
 
